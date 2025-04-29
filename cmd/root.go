@@ -42,55 +42,65 @@ func ParseAPISpec(path string) (res *handler.APISpec, err error) {
 
 func StartRegisterSkill(path string, key string) error {
 	slog.Info(key)
+
+	// Get user home directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
 	yafaiRoot := fmt.Sprintf("%s/.yafai", homeDir)
-
 	envFile := fmt.Sprintf("%s/.env", yafaiRoot)
 
-	// 1. Read the existing .env file into a map
+	// Read existing .env file
 	envMap, err := godotenv.Read(envFile)
 	if err != nil {
-		// Handle error if the file doesn't exist or can't be read
-		log.Printf("Error reading %s file: %v. Creating a new one.", envFile, err)
-		envMap = make(map[string]string) // Start with an empty map if file doesn't exist
+		log.Printf("Error reading %s: %v. Creating new file.", envFile, err)
+		envMap = make(map[string]string)
 	}
 
-	// 2. Modify the map (add or update variables)
+	// Update environment variables
 	envMap["SKILL_KEY"] = key
-	// You can also delete a key if needed:
-	// delete(envMap, "VARIABLE_TO_REMOVE")
 
-	// 3. Write the updated map back to the .env file
-	err = godotenv.Write(envMap, envFile)
-	if err != nil {
-		log.Fatalf("Error writing updated .env file: %v", err)
+	if err := godotenv.Write(envMap, envFile); err != nil {
+		log.Fatalf("failed to write .env file: %v", err)
 	}
 
 	fmt.Printf("Successfully updated %s\n", envFile)
-	err = godotenv.Load(envFile)
+
+	// Load updated .env
+	if err := godotenv.Load(envFile); err != nil {
+		slog.Error(err.Error())
+	}
 
 	os.Setenv("SKILL_KEY", key)
+
+	// Parse manifest
 	manifest, err := ParseAPISpec(path)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	//lis, err := net.Listen("tcp", ":5001")
-	sockPath := fmt.Sprintf("%s/plugins/skill.sock", yafaiRoot)
 
-	// Attempt to remove socket file, ignore "file not found" errors
-	if err := os.Remove(sockPath); err != nil && !os.IsNotExist(err) {
-		log.Fatalf("failed to remove existing socket file: %v", err)
+	// Ensure plugins directory exists
+	pluginDir := fmt.Sprintf("%s/plugins", yafaiRoot)
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		log.Fatalf("failed to create plugins directory: %v", err)
 	}
 
-	// Create new listener
+	// Manage socket
+	sockPath := fmt.Sprintf("%s/skill.sock", pluginDir)
+
+	// Clean old socket file
+	if err := os.Remove(sockPath); err != nil && !os.IsNotExist(err) {
+		log.Fatalf("failed to remove old socket file: %v", err)
+	}
+
+	// Create new UNIX socket listener
 	lis, err := net.Listen("unix", sockPath)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("failed to listen on socket: %v", err)
 	}
+	defer lis.Close()
 
 	// Optional: Ensure socket is cleaned up on exit
 	defer func() {
