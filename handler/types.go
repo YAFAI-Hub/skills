@@ -51,9 +51,9 @@ type RunningAction struct {
 	BaseURL          string
 	Method           string
 	Headers          map[string]string
-	QueryParams      map[string]string
-	BodyParams       map[string]string // To hold structured body parameters
-	PathParams       map[string]string
+	QueryParams      map[string]interface{}
+	BodyParams       map[string]interface{} // To hold structured body parameters
+	PathParams       map[string]interface{}
 	Body             string           // For cases where the body needs to be a raw string (e.g., non-JSON)
 	ResponseTemplate ResponseTemplate `yaml:"response_template"`
 }

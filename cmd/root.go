@@ -78,10 +78,25 @@ func StartRegisterSkill(path string, key string) error {
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	lis, err := net.Listen("tcp", ":5001") // Listen on port 50051
+	//lis, err := net.Listen("tcp", ":5001")
+	sockPath := fmt.Sprintf("%s/plugins/skill.sock", yafaiRoot)
+
+	// Attempt to remove socket file, ignore "file not found" errors
+	if err := os.Remove(sockPath); err != nil && !os.IsNotExist(err) {
+		log.Fatalf("failed to remove existing socket file: %v", err)
+	}
+
+	// Create new listener
+	lis, err := net.Listen("unix", sockPath)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
+
+	// Optional: Ensure socket is cleaned up on exit
+	defer func() {
+		lis.Close()
+		os.Remove(sockPath)
+	}()
 
 	os.Setenv("SKILL_TOKEN", key)
 
