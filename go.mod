@@ -1,4 +1,4 @@
-module yafai-github
+module yafai-skill
 
 go 1.24.2
 

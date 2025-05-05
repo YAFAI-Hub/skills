@@ -15,7 +15,7 @@ import (
 	"text/template"
 	"time"
 
-	pb "yafai-github/proto" // Replace with your actual proto package path
+	pb "yafai-skill/proto"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -100,7 +100,7 @@ func (s *SkillServer) GetActions(ctx context.Context, req *pb.GetActionRequest) 
 }
 
 func (s *SkillServer) ExecuteAction(ctx context.Context, req *pb.ExecuteActionRequest) (*pb.ExecuteActionResponse, error) {
-	slog.Info("%+v", req)
+	//slog.Info("%+v", req)
 	reqID := uuid.New().String()
 	slog.Info("ExecuteAction called | ID: %s | Action: %s | Time: %s", reqID, req.Name, time.Now().Format(time.RFC3339Nano))
 

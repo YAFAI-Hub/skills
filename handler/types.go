@@ -1,7 +1,7 @@
 package skill
 
 import (
-	skill "yafai-github/proto"
+	skill "yafai-skill/proto"
 )
 
 // APISpec represents the top-level structure of your YAML file.

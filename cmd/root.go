@@ -11,8 +11,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	handler "yafai-github/handler"
-	skill "yafai-github/proto"
+	handler "yafai-skill/handler"
+	skill "yafai-skill/proto"
 
 	"gopkg.in/yaml.v3"
 

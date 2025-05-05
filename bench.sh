@@ -1,0 +1,1 @@
+ghz --insecure --proto ./proto/skill.proto --call skill.SkillService.ExecuteAction -d '{"name":"GetContact","queryParams":{"name":"Roy"}}' --total 100000 unix:///Users/ssbodapati/.yafai/plugins/skill.sock --concurrency 100 -O html -o report.html --cpus 10 --timeout 20s
