@@ -26,7 +26,7 @@ func ParseAPISpec(path string) (res *handler.APISpec, err error) {
 	yamlFile, err := os.ReadFile(path)
 	if err != nil {
 		slog.Error("Error reading YAML file:", err)
-		return nil, fmt.Errorf("error reading YAML file: %w", err) // Use fmt.Errorf for better error wrapping
+		return nil, fmt.Errorf("error reading YAML file: %w", err)
 	}
 	slog.Info("Successfully read YAML file: %s", path)
 
@@ -34,7 +34,7 @@ func ParseAPISpec(path string) (res *handler.APISpec, err error) {
 	err = yaml.Unmarshal(yamlFile, &apiSpec)
 	if err != nil {
 		slog.Error("Error unmarshalling YAML:", err)
-		return nil, fmt.Errorf("error unmarshalling YAML: %w", err) // Use fmt.Errorf
+		return nil, fmt.Errorf("error unmarshalling YAML: %w", err)
 	}
 	slog.Info("Successfully unmarshalled YAML data.")
 	return &apiSpec, nil
@@ -114,7 +114,7 @@ func StartRegisterSkill(path string, key string) error {
 	reflection.Register(s)
 
 	srv := &handler.SkillServer{Name: "yafai-github", Description: "Github Skill for yafai", ActionsMap: manifest.Actions}
-	skill.RegisterSkillServiceServer(s, srv) // Use your generated proto package
+	skill.RegisterSkillServiceServer(s, srv)
 
 	go func() {
 		if err := s.Serve(lis); err != nil {
@@ -143,8 +143,7 @@ var rootCmd = &cobra.Command{
 	Use:   "yafai-github",
 	Short: "Skills Engine for YAFAI Framework",
 	Long:  ``,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
+
 	Run: func(cmd *cobra.Command, args []string) {
 		path, _ := cmd.Flags().GetString("manifest")
 		key, _ := cmd.Flags().GetString("skill_key")
