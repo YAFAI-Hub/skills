@@ -1,0 +1,248 @@
+name: Hubspot CRM
+description: A workspace to interact with HubSpot CRM API for managing contacts, deals, and associations.
+get-objects-hubspot: &get-objects-hubspot
+  method: POST
+  headers:
+    Content-Type: application/json
+  base_url: "https://api.hubapi.com/crm/v3/objects/{objectType}/search"
+  params:
+    - name: objectType
+      type: string
+      in: path
+      description: The type of object to search within (e.g., 'contacts', 'deals').
+      required: true
+    - name: filterGroups
+      type: array
+      in: body
+      description: Groups of filters to apply.
+      required: true
+      items:
+        - name: filters
+          type: array
+          required: true
+          items:
+            - name: propertyName
+              type: string
+              required: true
+            - name: operator
+              type: string
+              enum:
+                - "EQ"
+                - "NEQ"
+                - "IN"
+                - "NIN"
+                - "LT"
+                - "GT"
+                - "LTE"
+                - "GTE"
+                - "CONTAINS_TOKEN"
+                - "NOT_CONTAINS_TOKEN"
+              required: true
+            - name: value
+              type: string
+              required: true
+    - name: properties
+      type: array
+      in: body
+      description: The properties to return in the search results.
+      items:
+        - type: string
+    - name: limit
+      type: integer
+      in: body
+      description: The maximum number of results to return.
+    - name: after
+      type: string
+      in: body
+      description: The paging cursor token. (e.g., for pagination)
+auth_header: "Authorization"
+actions:
+  GetContacts:
+    <<: *get-objects-hubspot
+    desc: |
+      Fetches a list of contacts from HubSpot CRM.
+    response_template:
+      success: |
+        Fetched the following results:
+        {{range .results}} 
+        - ID: {{.id}}
+          - First Name: {{.properties.firstname}}
+          - Last Name: {{.properties.lastname}}
+          - Email: {{.properties.email}}
+          - Created At: {{.createdAt}}
+          - Last Modified At: {{.updatedAt}}
+          - Archived: {{.archived}}
+        {{end}}
+      failure: "Failed to process the request: {{.error}}"
+  GetDeals:
+    <<: *get-objects-hubspot
+    desc: |
+      Fetches a list of deals from HubSpot CRM.
+    response_template:
+      success: |
+        Fetched the following results:
+        {{range .results}} 
+        - ID: {{.id}}
+          - Deal Name: {{.properties.dealname}}
+          - Amount: {{.properties.amount}}
+          - Pipeline: {{.properties.pipeline}}
+          - Deal Stage: {{.properties.dealstage}}
+          - Closed Date: {{.properties.closedate}}
+          - Forecast Amount: {{.properties.hs_forecast_amount}}
+          - Is Closed: {{.properties.hs_is_closed}}
+          - Created At: {{.createdAt}}
+          - Last Modified At: {{.updatedAt}}
+          - Archived: {{.archived}}
+        {{end}}
+      failure: "Failed to process the request: {{.error}}"
+  CreateDeal:
+    desc: |
+      Creates a new deal in HubSpot CRM.
+    method: POST
+    base_url: "https://api.hubapi.com/crm/v3/objects/deals"
+    params:
+      - name: properties
+        type: object
+        in: body
+        description: The properties of the deal to create.
+        required: true
+        properties:
+          - name: dealname
+            type: string
+            required: true
+            description: The name of the deal.
+          - name: pipeline
+            type: string
+            required: true
+            description: The pipeline to which the deal belongs.
+          - name: dealstage
+            type: string
+            required: true
+            description: The stage of the deal.
+          - name: amount
+            type: number
+            required: false
+            description: The value of the deal.
+          - name: closedate
+            type: string
+            required: true
+            description: An ISO8601 date‐time string (e.g. "2025-05-10T15:04:05Z").
+    response_template:
+      success: |
+        Created the following deal:
+        - ID: {{.id}}
+        - Deal Name: {{.properties.dealname}}
+        - Amount: {{.properties.amount}}
+        - Pipeline: {{.properties.pipeline}}
+        - Deal Stage: {{.properties.dealstage}}
+        - Closed Date: {{.properties.closedate}}
+        - Forecast Amount: {{.properties.hs_forecast_amount}}
+        - Is Closed: {{.properties.hs_is_closed}}
+        - Created At: {{.createdAt}}
+        - Last Modified At: {{.updatedAt}}
+        - Archived: {{.archived}}
+
+      failure: "Failed to process the request: {{.error}}"
+
+    headers:
+      Content-Type: application/json
+  
+  #association actions
+  AssociateDealToObjects:
+    desc: |
+      Associate a deal to one or more objects (e.g., contacts, companies) in HubSpot.
+      To get association type ID and association Category for association use GetAssociationLabels action.
+    method: PUT
+    base_url: "https://api.hubapi.com/crm/v4/objects/{fromObjectType}/{fromObjectId}/associations/{toObjectType}/{toObjectId}"
+    params:
+      - name: fromObjectType
+        type: string
+        in: path
+        description: The type of the source object (e.g., "deals").
+        required: true
+      - name: fromObjectId
+        type: string
+        in: path
+        description: The ID of the source object.
+        required: true
+      - name: toObjectType
+        type: string
+        in: path
+        description: The type of the target object (e.g., "contacts").
+        required: true
+      - name: toObjectId
+        type: string
+        in: path
+        description: The ID of the target object.
+        required: true
+      - name: associations   # this *is* the body itself—an array
+        in: body
+        type: array
+        description: |
+          A JSON array of association specs.  The entire request body *must* be
+          this array (no wrapper object).
+        required: true
+        root_body: true 
+        items:
+          - name: associationCategory
+            type: string
+            description: The category of the association.
+            required: true
+            enum:
+              - HUBSPOT_DEFINED
+              - USER_DEFINED
+              - INTEGRATOR_DEFINED
+          - name: associationTypeId
+            type: integer
+            description: The ID of the association type.
+            required: true
+
+    response_template:
+      success: |
+        Association created successfully:
+        - From Object ID: {{.fromObjectId}}
+        - To Object ID: {{.toObjectId}}
+        - Association Category: {{.associationCategory}}
+        - Association Type ID: {{.associationTypeId}}
+      failure: |
+        Failed to create association:
+        - From Object ID: {{.fromObjectId}}
+        - To Object ID: {{.toObjectId}}
+        - Error: {{.error.message}}
+  GetAssociationLabels:
+    desc: |
+      Use this action for any association request, association requests need associationCategory and associationType between two object types , use this action to fetch them and then proceed with association creation.
+    method: GET
+    base_url: "https://api.hubapi.com/crm/v4/associations/{fromObjectType}/{toObjectType}/labels"
+    params:
+      - name: fromObjectType
+        type: string
+        in: path
+        description: The type of the source object in lower case (e.g., "deals").
+        enum:
+          - deals
+          - contacts
+          - companies
+          - tickets
+        required: true
+      - name: toObjectType
+        type: string
+        in: path
+        description: The type of the target object in lower case (e.g., "contacts").
+        enum:
+          - deals
+          - contacts
+          - companies
+          - tickets
+        required: true
+    response_template:
+      success: |
+        `Success:
+        {{range .results}} 
+          - Category: {{.category}}
+          - TypeId: {{.typeId}}
+        {{end}}`
+      failure: |
+        Failed to retrieve association labels:
+        - Error: {{.error.message}}
+

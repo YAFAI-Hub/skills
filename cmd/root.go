@@ -61,7 +61,6 @@ func StartRegisterSkill(path string, key string) error {
 
 	// Update environment variables
 	envMap["SKILL_KEY"] = key
-
 	if err := godotenv.Write(envMap, envFile); err != nil {
 		log.Fatalf("failed to write .env file: %v", err)
 	}
@@ -96,7 +95,15 @@ func StartRegisterSkill(path string, key string) error {
 	}
 
 	// Create new UNIX socket listener
-	lis, err := net.Listen("unix", sockPath)
+	transport := os.Getenv("SKILL_TRANSPORT")
+	var lis net.Listener
+
+	switch transport {
+	case "tcp":
+		lis, err = net.Listen("tcp", "localhost:5001")
+	default:
+		lis, err = net.Listen("unix", sockPath)
+	}
 	if err != nil {
 		log.Fatalf("failed to listen on socket: %v", err)
 	}
@@ -169,13 +176,21 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
+	var transport string
 	var manifest string
 	var skill_key string
+
+	rootCmd.PersistentFlags().StringVarP(&transport, "transport", "t", "unix", "Transport protocol (unix or tcp)")
 	rootCmd.PersistentFlags().StringVarP(&manifest, "manifest", "m", "", "YAFAI Skills Manifest")
 	rootCmd.PersistentFlags().StringVarP(&skill_key, "skill_key", "k", "", "YAFAI Skills key")
 
-	// Mark the "manifest" flag as required
 	rootCmd.MarkPersistentFlagRequired("manifest")
 	rootCmd.MarkPersistentFlagRequired("skill_key")
+
+	// Move the transport handling to PreRun
+	rootCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		slog.Info("transport", transport)
+		os.Setenv("SKILL_TRANSPORT", transport)
+	}
 
 }

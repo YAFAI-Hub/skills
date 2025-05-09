@@ -27,7 +27,7 @@ Run the binary with the following parameters to start Skill Engin
 ```
 //run the skill engine with below params
 
-yafai-skill -m [manifest file path] -k [api key for the service]
+yafai-skill -m [manifest file path] -k [api key for the service] -t transport [unix socker for local, tcp for over the network]
 yafai-skill -h //for help on parameters.
 
 ```

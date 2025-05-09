@@ -36,6 +36,9 @@ message Parameter {
   string in = 3;   // "query" or "body" or "path"
   string description = 4;
   bool required = 5;
+  repeated string enum = 6;
+  repeated Parameter properties = 7;
+  repeated Parameter items = 8;
 }
 
 message Value {

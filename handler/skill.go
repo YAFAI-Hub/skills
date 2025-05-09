@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// Helper to convert google.protobuf.Struct to Go map
+// Struct to handle YAML unmarshal to Go objects
 func structToMap(m *structpb.Struct) map[string]interface{} {
 	result := make(map[string]interface{})
 	if m == nil {
@@ -65,18 +65,31 @@ func structpbValueToInterface(v *structpb.Value) interface{} {
 func (s *SkillServer) GetActions(ctx context.Context, req *pb.GetActionRequest) (res *pb.GetActionsResponse, err error) {
 	slog.Info("Received GetActions request for task: %s", req.Task)
 
+	// Check if ActionsMap is populated correctly
 	toolDefinitions := s.ActionsMap // Access the parsed actions
+	if len(toolDefinitions) == 0 {
+		slog.Error("No actions found in ActionsMap")
+	}
 
 	actions := make([]*pb.Action, 0, len(toolDefinitions))
 	for actionName, actionDef := range toolDefinitions {
+		// Log the actionName and the action definition for debugging
+		slog.Info("Processing action: %s", actionName)
+
 		params := make([]*pb.Parameter, len(actionDef.Params))
 		for i, p := range actionDef.Params {
+			// Log each parameter being processed
+			slog.Info("Processing param: %s", p.Name)
+
 			params[i] = &pb.Parameter{
-				Name:        p.Name, // Note: p.Name will be empty based on current struct
+				Name:        p.Name,
 				Type:        p.Type,
 				In:          p.In,
 				Description: p.Desc,
 				Required:    p.Required,
+				Enum:        p.Enum,
+				Properties:  convertToPBParameters(p.Properties), // Convert nested properties
+				Items:       convertToPBParameters(p.Items),      // Convert array items
 			}
 		}
 
@@ -89,6 +102,7 @@ func (s *SkillServer) GetActions(ctx context.Context, req *pb.GetActionRequest) 
 			Params:      params,
 			Headers:     actionDef.Headers,
 		}
+
 		actions = append(actions, pbAction)
 	}
 
@@ -96,7 +110,36 @@ func (s *SkillServer) GetActions(ctx context.Context, req *pb.GetActionRequest) 
 		Actions: actions,
 	}
 
+	// Log the final response for debugging
+	slog.Info("Returning response with %d actions", len(actions))
+
 	return res, nil
+}
+
+// Helper function for nested properties conversion
+func convertToPBParameters(params []*Param) []*pb.Parameter {
+	if params == nil {
+		return nil
+	}
+
+	pbParams := make([]*pb.Parameter, len(params))
+	for i, p := range params {
+		pbParams[i] = &pb.Parameter{
+			Name:        p.Name,
+			Type:        p.Type,
+			In:          p.In,
+			Description: p.Desc,
+			Required:    p.Required,
+			Enum:        p.Enum,
+			Properties:  convertToPBParameters(p.Properties), // Recursively convert nested properties
+		}
+
+		// Handle array of objects, items could be objects with nested properties
+		if p.Type == "array" && len(p.Items) > 0 {
+			pbParams[i].Items = convertToPBParameters(p.Items) // Recursive for array of objects
+		}
+	}
+	return pbParams
 }
 
 func (s *SkillServer) ExecuteAction(ctx context.Context, req *pb.ExecuteActionRequest) (*pb.ExecuteActionResponse, error) {
@@ -129,6 +172,7 @@ func (s *SkillServer) ExecuteAction(ctx context.Context, req *pb.ExecuteActionRe
 	// Set up parameters
 	for _, paramDef := range actionDef.Params {
 		var paramValue interface{}
+
 		var ok bool
 
 		switch strings.ToLower(paramDef.In) {
@@ -147,6 +191,15 @@ func (s *SkillServer) ExecuteAction(ctx context.Context, req *pb.ExecuteActionRe
 				return nil, fmt.Errorf("missing required path param '%s'", paramDef.Name)
 			}
 		case "body":
+			if paramDef.In == "body" && paramDef.RootBody {
+				raw, ok := runningAction.BodyParams[paramDef.Name].([]interface{})
+				if !ok {
+					return nil, fmt.Errorf("expected array for %s", paramDef.Name)
+				}
+				runningAction.RawBody = raw                     // store the slice
+				delete(runningAction.BodyParams, paramDef.Name) // don’t send it in BodyParams
+				break
+			}
 			paramValue, ok = runningAction.BodyParams[paramDef.Name]
 			if ok {
 				runningAction.BodyParams[paramDef.Name] = paramValue
@@ -246,6 +299,25 @@ func (a *RunningAction) Execute(ctx context.Context, resultChan chan<- ActionRes
 
 	var payload io.Reader
 
+	if a.RawBody != nil {
+		// directly encode the slice or map
+		buf := &bytes.Buffer{}
+		if err := json.NewEncoder(buf).Encode(a.RawBody); err != nil {
+			resultChan <- ActionResult{Error: err}
+			return
+		}
+		payload = buf
+
+	} else if len(a.BodyParams) > 0 {
+		// fallback: encode the remaining map as JSON object
+		buf := &bytes.Buffer{}
+		if err := json.NewEncoder(buf).Encode(a.BodyParams); err != nil {
+			resultChan <- ActionResult{Error: err}
+			return
+		}
+		payload = buf
+	}
+
 	// Handle body params
 	if len(a.BodyParams) > 0 {
 		bodyBytes, err := json.Marshal(a.BodyParams)
@@ -269,8 +341,8 @@ func (a *RunningAction) Execute(ctx context.Context, resultChan chan<- ActionRes
 	for key, value := range a.Headers {
 		req.Header.Set(key, value)
 	}
-	slog.Info(os.Getenv("SKILL_KEY"))
-	req.Header.Set("x-api-key", os.Getenv("SKILL_KEY"))
+	auth_key := fmt.Sprintf("Bearer %s", os.Getenv("SKILL_KEY"))
+	req.Header.Set("Authorization", auth_key)
 	req.Header.Set("content-type", "application/json")
 
 	client := &http.Client{Timeout: 15 * time.Second}
@@ -287,7 +359,7 @@ func (a *RunningAction) Execute(ctx context.Context, resultChan chan<- ActionRes
 		resultChan <- ActionResult{Error: err}
 		return
 	}
-
+	slog.Info("Response Body: %s", string(body))
 	if resp.StatusCode >= http.StatusBadRequest {
 		err := fmt.Errorf("HTTP error: %s, body: %s", resp.Status, string(body))
 		resultChan <- ActionResult{Error: err}
