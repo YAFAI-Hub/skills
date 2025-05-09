@@ -41,8 +41,6 @@ func ParseAPISpec(path string) (res *handler.APISpec, err error) {
 }
 
 func StartRegisterSkill(path string, key string) error {
-	slog.Info(key)
-
 	// Get user home directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
