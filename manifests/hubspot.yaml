@@ -148,9 +148,9 @@ actions:
       Content-Type: application/json
   
   #association actions
-  AssociateDealToObjects:
+  AssociateObjects:
     desc: |
-      Associate a deal to one or more objects (e.g., contacts, companies) in HubSpot.
+      Use this action to associate an object to one or more objects (e.g., contacts, companies) in HubSpot.
       To get association type ID and association Category for association use GetAssociationLabels action.
     method: PUT
     base_url: "https://api.hubapi.com/crm/v4/objects/{fromObjectType}/{fromObjectId}/associations/{toObjectType}/{toObjectId}"
@@ -211,7 +211,7 @@ actions:
         - Error: {{.error.message}}
   GetAssociationLabels:
     desc: |
-      Use this action for any association request, association requests need associationCategory and associationType between two object types , use this action to fetch them and then proceed with association creation.
+      Use this action to fetch association category and association type ID , fetch them and then proceed with association creation.
     method: GET
     base_url: "https://api.hubapi.com/crm/v4/associations/{fromObjectType}/{toObjectType}/labels"
     params:
